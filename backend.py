@@ -162,6 +162,11 @@ def get_time_left():
     auction_end = product.get("auction_end_time")
     if not auction_end:
         return jsonify({"error": "Auction end time not set"}), 400
+    try:
+        # Convert ISO string to datetime
+        auction_end = datetime.fromisoformat(auction_end)
+    except Exception as e:
+        return jsonify({"error": f"Invalid date format: {str(e)}"}), 400
 
     now = datetime.utcnow()
     time_left = (auction_end - now).total_seconds()
