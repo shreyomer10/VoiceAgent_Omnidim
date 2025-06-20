@@ -102,50 +102,59 @@ def place_bid():
     return jsonify({"success": True, "message": "Bid placed successfully."})
 
 # 3. GET highest bid for product
-@app.route("/product/<product_key>/highest-bid", methods=["GET"])
-def get_highest_bid(product_key):
+@app.route("/highest-bid", methods=["GET"])
+def get_highest_bid():
+    product_key = request.args.get("product_key")
 
+    if not product_key:
+        return jsonify({"error": "Missing product_key in query."}), 400
 
     try:
         product_id = int(product_key)
     except ValueError:
         product_id = None
 
-    # Search by id or name
     query = {
         "$or": [
-            {"id": str(product_key)},    # for string ID
-            {"id": product_id},          # for numeric ID
-            {"name": product_key}        # match by name
+            {"id": str(product_key)},
+            {"id": product_id},
+            {"name": product_key}
         ]
     }
+
     product = products.find_one(query)
     if not product:
         return jsonify({"error": "Product not found"}), 404
 
     embedded_bids = product.get("bids", [])
     max_bid = max([b.get("amount", 0) for b in embedded_bids], default=0)
+
     return jsonify({
         "product": product["name"],
         "highest_bid": max_bid
     })
 
 # 4. GET time left for product
-@app.route("/product/<product_key>/time-left", methods=["GET"])
-def get_time_left(product_key):
+@app.route("/time-left", methods=["GET"])
+def get_time_left():
+    product_key = request.args.get("product_key")
+
+    if not product_key:
+        return jsonify({"error": "Missing product_key in query."}), 400
+
     try:
         product_id = int(product_key)
     except ValueError:
         product_id = None
 
-    # Search by id or name
     query = {
         "$or": [
-            {"id": str(product_key)},    # for string ID
-            {"id": product_id},          # for numeric ID
-            {"name": product_key}        # match by name
+            {"id": str(product_key)},
+            {"id": product_id},
+            {"name": product_key}
         ]
     }
+
     product = products.find_one(query)
     if not product:
         return jsonify({"error": "Product not found"}), 404
@@ -157,37 +166,41 @@ def get_time_left(product_key):
     now = datetime.utcnow()
     time_left = (auction_end - now).total_seconds()
     time_left = max(int(time_left), 0)
+
     return jsonify({
         "product": product["name"],
         "time_remaining_seconds": time_left
     })
-@app.route("/product/<product_key>/bids", methods=["GET"])
-def get_all_bids(product_key):
-    # Try converting product_key to int
+@app.route("/bids", methods=["GET"])
+def get_all_bids():
+    product_key = request.args.get("product_key")
+
+    if not product_key:
+        return jsonify({"error": "Missing product_key in query."}), 400
+
     try:
         product_id = int(product_key)
     except ValueError:
         product_id = None
 
-    # Find product by id or name
-    product = products.find_one({
+    query = {
         "$or": [
             {"id": str(product_key)},
             {"id": product_id},
             {"name": product_key}
         ]
-    })
+    }
 
+    product = products.find_one(query)
     if not product:
         return jsonify({"error": "Product not found"}), 404
 
-    # Find all bids for this product
     bid_list = bids.find({
         "$or": [
             {"product_id": product.get("id")},
             {"product_name": product.get("name")}
         ]
-    }).sort("timestamp", -1)  # Newest first
+    }).sort("timestamp", -1)
 
     result = []
     for b in bid_list:
