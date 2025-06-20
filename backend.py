@@ -4,7 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import pytz
 import os
-
+from flask_cors import CORS
 # Load environment variables
 load_dotenv()
 
@@ -17,6 +17,7 @@ products = db["products"]
 bids = db["bids"]
 
 app = Flask(__name__)
+CORS(app)
 utc = pytz.utc
 
 
@@ -201,3 +202,8 @@ def get_all_bids(product_key):
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
+
+
+        
