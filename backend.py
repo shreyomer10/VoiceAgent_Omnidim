@@ -29,6 +29,49 @@ utc = pytz.utc
 def home():
     return jsonify({"message": "Welcome to CodeClash Auction Table"}), 200
 
+@app.route("/admin/all_auctions", methods=["GET"])
+def get_all_auctions():
+    try:
+        auction_list = list(auctions.find({}))
+        result = []
+        for a in auction_list:
+            result.append({
+                "id": a.get("id"),
+                "name": a.get("name"),
+                "valid_until": a.get("valid_until"),
+                "product_ids": a.get("product_ids", [])
+            })
+        return jsonify({
+            "total_auctions": len(result),
+            "auctions": result
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error fetching auctions: {str(e)}")
+        return jsonify({"error": "Failed to fetch auctions"}), 500
+@app.route("/admin/auction_products/<auction_id>", methods=["GET"])
+def get_products_by_auction(auction_id):
+    try:
+        matching_products = list(products.find({"auction_id": auction_id}))
+        result = []
+        for p in matching_products:
+            result.append({
+                "id": p.get("id"),
+                "name": p.get("name"),
+                "description": p.get("description"),
+                "status": p.get("status"),
+                "time": p.get("time")
+            })
+        return jsonify({
+            "auction_id": auction_id,
+            "total_products": len(result),
+            "products": result
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Error fetching products for auction {auction_id}: {str(e)}")
+        return jsonify({"error": "Failed to fetch products for the given auction"}), 500
+
 
 @app.route("/products", methods=["GET"])
 def get_products():
