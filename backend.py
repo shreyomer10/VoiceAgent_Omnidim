@@ -73,8 +73,8 @@ def get_products():
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
-@app.route("admin/products", methods=["GET"])
-def get_products():
+@app.route("/admin/products", methods=["GET"])
+def get_products2():
     try:
         now = datetime.utcnow()
         # Auto-mark products as sold if expired and have bids
