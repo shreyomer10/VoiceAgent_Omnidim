@@ -106,20 +106,18 @@ def get_products2():
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
-from pymongo.errors import PyMongoError
-
-from pymongo.errors import PyMongoError
-
 @app.route("/admin/all_products", methods=["GET"])
 def get_productsAll():
     try:
         now = datetime.utcnow()
-
-        # Fetch all products (no filters applied)
         query = {}
 
         try:
             matching = list(products.find(query))
+            total_products = len(matching)
+            total_auctions = auctions.count_documents({})
+            total_bids = bids.count_documents({})
+
             result = []
             for p in matching:
                 result.append({
@@ -130,7 +128,13 @@ def get_productsAll():
                     "status": p.get("status"),
                     "time": p.get("time")
                 })
-            return jsonify(result), 200
+
+            return jsonify({
+                "total_products": total_products,
+                "total_auctions": total_auctions,
+                "total_bids": total_bids,
+                "products": result
+            }), 200
 
         except PyMongoError as e:
             app.logger.error(f"Database error fetching products: {str(e)}")
