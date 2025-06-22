@@ -106,6 +106,42 @@ def get_products2():
         return jsonify({"error": "An unexpected error occurred"}), 500
 
 
+from pymongo.errors import PyMongoError
+
+from pymongo.errors import PyMongoError
+
+@app.route("/admin/all_products", methods=["GET"])
+def get_productsAll():
+    try:
+        now = datetime.utcnow()
+
+        # Fetch all products (no filters applied)
+        query = {}
+
+        try:
+            matching = list(products.find(query))
+            result = []
+            for p in matching:
+                result.append({
+                    "id": p.get("id"),
+                    "name": p.get("name"),
+                    "description": p.get("description"),
+                    "auction_id": p.get("auction_id"),
+                    "status": p.get("status"),
+                    "time": p.get("time")
+                })
+            return jsonify(result), 200
+
+        except PyMongoError as e:
+            app.logger.error(f"Database error fetching products: {str(e)}")
+            return jsonify({"error": "Failed to fetch products due to database error"}), 500
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error in get_productsAll: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
+
+
 @app.route("/bid", methods=["POST"])
 def place_bid():
     try:
@@ -505,7 +541,7 @@ def add_product():
             "id": data["id"],
             "name": data["name"],
             "description": data["description"],
-            "auction_id": data.get("auction_id"),
+            "auction_id": None,
             "time": data["time"],
             "status": "unsold",
             "bids": []
