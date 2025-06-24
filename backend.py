@@ -1,24 +1,29 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,make_response
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import pytz
 import os
 from flask_cors import CORS
 from bson.objectid import ObjectId
 from pymongo.errors import PyMongoError
-
+import bcrypt
+import jwt
+from tokenCheck import token_required
 # Load environment variables
 load_dotenv()
 
 # Setup
 MONGO_URI = os.getenv("MONGO_URI")
+SECRET_KEY =os.getenv("SECRET_KEY")
 DB_NAME = os.getenv("DB_NAME")
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 products = db["products"]
 bids = db["bids"]
 auctions = db["auctions"]
+users=db["users"]
+admins=db["admins"]
 
 app = Flask(__name__)
 CORS(app)
@@ -28,6 +33,190 @@ utc = pytz.utc
 @app.route("/")
 def home():
     return jsonify({"message": "Welcome to CodeClash Auction Table"}), 200
+
+
+# ---------------- REGISTER ------------------
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.json
+    name = data.get("name")
+    username = data.get("username")
+    password = data.get("password")
+    mobile = data.get("mobile_number")
+
+    if not all([name, username, password, mobile]):
+        return jsonify({"error": "All fields are required"}), 400
+
+    existing_user = users.find_one({"username": username})
+    if existing_user:
+        return jsonify({"error": "Username already exists"}), 400
+
+    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    users.insert_one({
+        "name": name,
+        "username": username,
+        "password": hashed_pw.decode('utf-8'),
+        "mobile_number": mobile
+    })
+
+    return jsonify({"message": "User registered successfully"}), 200
+
+
+# ---------------- LOGIN ------------------
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    user = users.find_one({"username": username})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if bcrypt.checkpw(password.encode('utf-8'), user["password"].encode('utf-8')):
+        payload = {
+            "user_id": str(user["_id"]),
+            "username": user["username"],
+            "exp": datetime.utcnow() + timedelta(hours=2)
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+        # Remove password before sending user details
+        user_details = {
+            "id": str(user["_id"]),
+            "name": user.get("name"),
+            "username": user.get("username"),
+            "mobile_number": user.get("mobile_number")
+        }
+
+        response = make_response(jsonify({
+            "message": "Login successful",
+            "user": user_details
+        }), 200)
+
+        # Set secure cookie with the token
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=True,            # Set to False if testing locally over HTTP
+            samesite='Lax',         # Or 'None' if cross-origin frontend
+            max_age=2 *60 *60       # 2 hours in seconds
+        )
+
+        return response
+    else:
+        return jsonify({"error": "Invalid password"}), 401
+
+# --------------- CHANGE PASSWORD ------------------
+@token_required
+@app.route("/change-password", methods=["POST"])
+def change_password():
+    data = request.json
+    username = data.get("username")
+    old_password = data.get("password")
+    new_password = data.get("new_password")
+
+    if not all([username, old_password, new_password]):
+        return jsonify({"error": "All fields are required"}), 400
+
+    user = users.find_one({"username": username})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if not bcrypt.checkpw(old_password.encode('utf-8'), user["password"].encode('utf-8')):
+        return jsonify({"error": "Incorrect current password"}), 401
+
+    hashed_new_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+    users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password": hashed_new_pw.decode('utf-8')}}
+    )
+
+    return jsonify({"message": "Password updated successfully"}), 200
+
+
+
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+    role = data.get("role")
+
+    if not all([username, password, role]) or role.lower() != "admin":
+        return jsonify({"error": "Username, password and role=admin are required"}), 400
+
+    admin = admins.find_one({"username": username, "role": "admin"})
+    if not admin:
+        return jsonify({"error": "Admin not found"}), 404
+
+    if bcrypt.checkpw(password.encode('utf-8'), admin["password"].encode('utf-8')):
+        payload = {
+            "admin_id": str(admin["_id"]),
+            "username": admin["username"],
+            "role": admin["role"],
+            "exp": datetime.utcnow() + timedelta(hours=2)
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+        admin_details = {
+            "id": str(admin["_id"]),
+            "name": admin.get("name"),
+            "username": admin.get("username"),
+            "mobile_number": admin.get("mobile_number"),
+            "role": admin.get("role")
+        }
+
+        response = make_response(jsonify({
+            "message": "Admin login successful",
+            "token": token,
+            "admin": admin_details
+        }), 200)
+
+        response.set_cookie(
+            key="admin_token",
+            value=token,
+            httponly=True,
+            secure=True,
+            samesite='Lax',
+            max_age=2 * 60 * 60
+        )
+
+        return response
+    else:
+        return jsonify({"error": "Incorrect password"}), 401
+
+@token_required
+@app.route("/admin/change-password", methods=["POST"])
+def admin_change_password():
+    data = request.json
+    username = data.get("username")
+    old_password = data.get("password")
+    new_password = data.get("new_password")
+    role = data.get("role")
+
+    if not all([username, old_password, new_password, role]) or role.lower() != "admin":
+        return jsonify({"error": "All fields (with role=admin) are required"}), 400
+
+    admin = admins.find_one({"username": username, "role": "admin"})
+    if not admin:
+        return jsonify({"error": "Admin not found"}), 404
+
+    if not bcrypt.checkpw(old_password.encode('utf-8'), admin["password"].encode('utf-8')):
+        return jsonify({"error": "Incorrect current password"}), 401
+
+    hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+    admins.update_one(
+        {"_id": admin["_id"]},
+        {"$set": {"password": hashed_pw.decode('utf-8')}}
+    )
+
+    return jsonify({"message": "Password updated successfully"}), 200
+
 
 @app.route("/admin/all_auctions", methods=["GET"])
 def get_all_auctions():
@@ -49,6 +238,8 @@ def get_all_auctions():
     except Exception as e:
         app.logger.error(f"Error fetching auctions: {str(e)}")
         return jsonify({"error": "Failed to fetch auctions"}), 500
+
+
 @app.route("/admin/auction_products/<auction_id>", methods=["GET"])
 def get_products_by_auction(auction_id):
     try:
@@ -439,8 +630,42 @@ def get_all_bids():
         app.logger.error(f"Unexpected error in get_all_bids: {str(e)}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+@token_required
+@app.route("/user-bids", methods=["GET"])
+def get_user_bids():
+    try:
+        user_id = request.args.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Missing user_id in query."}), 400
+
+        try:
+            bid_query = {"user_id": user_id}
+            bid_list = bids.find(bid_query).sort("timestamp", -1)
+
+            result = []
+            for b in bid_list:
+                result.append({
+                    "product_id": b.get("product_id"),
+                    "product_name": b.get("product_name"),
+                    "amount": b.get("amount"),
+                    "timestamp": b.get("timestamp").isoformat() if b.get("timestamp") else None,
+                    "status": b.get("status", "success")
+                })
+
+            return jsonify(result), 200
+
+        except Exception as e:
+            app.logger.error(f"Database error fetching user bids: {str(e)}")
+            return jsonify({"error": "Failed to fetch user bids due to database error"}), 500
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error in get_user_bids: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
+
 
 # Admin routes
+@token_required
 @app.route("/admin/auction", methods=["POST"])
 def create_auction():
     try:
@@ -485,7 +710,7 @@ def create_auction():
         app.logger.error(f"Unexpected error in create_auction: {str(e)}")
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
-
+@token_required
 @app.route("/admin/auction/<auction_id>", methods=["DELETE"])
 def delete_auction(auction_id):
     try:
@@ -529,7 +754,7 @@ def delete_auction(auction_id):
         app.logger.error(f"Unexpected error in delete_auction: {str(e)}")
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
-
+@token_required
 @app.route("/admin/product/<product_id>", methods=["DELETE"])
 def delete_product(product_id):
     try:
@@ -572,7 +797,7 @@ def delete_product(product_id):
         app.logger.error(f"Unexpected error in delete_product: {str(e)}")
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
-
+@token_required
 @app.route("/admin/product", methods=["POST"])
 def add_product():
     try:
@@ -605,7 +830,7 @@ def add_product():
         app.logger.error(f"Unexpected error in add_product: {str(e)}")
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
-
+@token_required
 @app.route("/admin/product/<product_id>", methods=["PUT"])
 def update_product(product_id):
     try:
@@ -642,7 +867,7 @@ def update_product(product_id):
         app.logger.error(f"Unexpected error in update_product: {str(e)}")
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
-
+@token_required
 @app.route("/admin/auction/<auction_id>", methods=["PUT"])
 def update_auction(auction_id):
     try:
