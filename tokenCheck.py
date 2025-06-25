@@ -2,10 +2,12 @@
 import os
 import bcrypt
 import jwt
-
+from dotenv import load_dotenv
 from functools import wraps
 from flask import Flask, request, jsonify
+load_dotenv()
 
+SECRET_KEY =os.getenv("SECRET_KEY")
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -17,7 +19,7 @@ def token_required(f):
             token = auth_header.split(" ")[1]
         else:
             # 2. Fallback: Try getting token from cookie
-            token = request.cookies.get("tokenId")
+            token = request.cookies.get("token")  # instead of "tokenId"
 
         if not token:
             return jsonify({"error": "Token is missing!"}), 401
