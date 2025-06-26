@@ -30,8 +30,12 @@ transactions=db["transactions"]
 
 
 app = Flask(__name__)
-CORS(app, origins="*") 
-
+CORS(app,
+supports_credentials=True,
+origins=[
+"http://localhost:5173",
+"https://smart-auction-1213.vercel.app"
+])
 utc = pytz.utc
 
 
