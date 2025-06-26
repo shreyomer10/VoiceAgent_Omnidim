@@ -33,14 +33,17 @@ app = Flask(__name__)
 
 CORS(app,
      supports_credentials=True,
-     origins=[
-         "http://localhost:5173",
-         "https://smart-auction-1213.vercel.app"
-     ],
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     resources={r"/*": {"origins": "*"}}
-)
+     resources={
+         r"/*": {
+             "origins": [
+                 "http://localhost:5173",
+                 "https://smart-auction-1213.vercel.app"
+             ],
+             "allow_headers": ["Content-Type", "Authorization"],
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+         }
+     })
+
 utc = pytz.utc
 
 
