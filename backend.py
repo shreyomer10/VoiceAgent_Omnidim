@@ -38,9 +38,8 @@ CORS(app,
          "https://smart-auction-1213.vercel.app"
      ],
      allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     resources={r"/*": {"origins": "*"}}
-)
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
 utc = pytz.utc
 
 
