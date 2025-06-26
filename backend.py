@@ -39,7 +39,6 @@ CORS(app,
      ],
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-
 utc = pytz.utc
 
 
