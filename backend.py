@@ -30,6 +30,9 @@ transactions=db["transactions"]
 
 
 app = Flask(__name__)
+app.register_blueprint(admin_bp, url_prefix='/')
+app.register_blueprint(auth_bp, url_prefix='/')
+app.register_blueprint(wallet_bp, url_prefix='/')
 
 CORS(app,
      supports_credentials=True,
@@ -42,9 +45,7 @@ CORS(app,
 utc = pytz.utc
 
 
-app.register_blueprint(admin_bp, url_prefix='/')
-app.register_blueprint(auth_bp, url_prefix='/')
-app.register_blueprint(wallet_bp, url_prefix='/')
+
 
 
 @app.route("/")
