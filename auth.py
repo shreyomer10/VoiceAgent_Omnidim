@@ -86,9 +86,9 @@ def login():
             key="token",
             value=token,
             httponly=True,
-            secure=True,            # Set to False if testing locally over HTTP
-            samesite='Lax',         # Or 'None' if cross-origin frontend
-            max_age=10 *60 *60       # 2 hours in seconds
+            secure=True,         # must be True for samesite=None to work
+            samesite='None',     # REQUIRED for cross-origin requests with credentials
+            max_age=10 * 60 * 60
         )
 
         return response
