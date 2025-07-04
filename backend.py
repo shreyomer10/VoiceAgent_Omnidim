@@ -16,7 +16,7 @@ CORS(app,
      supports_credentials=True,
      origins=[
          "http://localhost:5173",
-         "https://smart-auction-1213.vercel.app"
+         "https://smartauction.vercel.app/"
      ],
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
