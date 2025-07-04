@@ -4,10 +4,12 @@ from datetime import datetime, timedelta
 import bcrypt
 import jwt
 from tokenCheck import token_required
-from db import DB_NAME,MONGO_URI,SECRET_KEY
+from db import DB_NAME,MONGO_URI,db,SECRET_KEY
 
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
+# from db import DB_NAME,MONGO_URI,SECRET_KEY
+
+# client = MongoClient(MONGO_URI)
+# db = client[DB_NAME]
 
 products = db["products"]
 bids = db["bids"]
@@ -40,6 +42,7 @@ def register():
         "username": username,
         "password": hashed_pw.decode('utf-8'),
         "mobile_number": mobile,
+        "auctions":[],
         "wallet_balance":500.0
     })
 
@@ -74,10 +77,12 @@ def login():
             "name": user.get("name"),
             "username": user.get("username"),
             "mobile_number": user.get("mobile_number"),
+            "auctions":user.get("auctions"),
         }
 
         response = make_response(jsonify({
             "message": "Login successful",
+            "token": token,          # ✅ Include token in JSON
             "user": user_details
         }), 200)
 
@@ -86,8 +91,8 @@ def login():
             key="token",
             value=token,
             httponly=True,
-            secure=True,         # must be True for samesite=None to work
-            samesite='None',     # REQUIRED for cross-origin requests with credentials
+            secure=True,
+            samesite='None',
             max_age=10 * 60 * 60
         )
 
@@ -174,6 +179,42 @@ def admin_login():
     else:
         return jsonify({"error": "Incorrect password"}), 401
 
+
+@auth_bp.route("/admin/register", methods=["POST"])
+def admin_register():
+    data = request.json
+
+    name = data.get("name")
+    username = data.get("username")
+    password = data.get("password")
+    mobile = data.get("mobile_number")
+    role = data.get("role", "admin")  # optional, default "admin"
+
+    # ✅ Validate required fields
+    if not all([name, username, password, mobile]):
+        return jsonify({"error": "All fields (name, username, password, mobile_number) are required"}), 400
+
+    # ✅ Check for existing admin
+    existing_admin = admins.find_one({"username": username})
+    if existing_admin:
+        return jsonify({"error": "Admin username already exists"}), 400
+
+    # ✅ Hash the password
+    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+    # ✅ Insert admin
+    admin_doc = {
+        "name": name,
+        "username": username,
+        "password": hashed_pw.decode('utf-8'),
+        "mobile_number": mobile,
+        "role": role,
+        "created_at": datetime.utcnow()
+    }
+
+    admins.insert_one(admin_doc)
+
+    return jsonify({"message": "Admin registered successfully"}), 200
 
 @auth_bp.route("/admin/change-password", methods=["POST"])
 @token_required

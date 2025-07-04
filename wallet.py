@@ -93,14 +93,16 @@ def rollback_bid():
     if product.get("status") == "sold":
         return jsonify({"error": "Cannot rollback bid. Product already sold."}), 400
 
+    # New: enforce auction’s valid_until instead
+    auction = auctions.find_one({"id": product.get("auction_id")})
+    if not auction or "valid_until" not in auction:
+        return jsonify({"error": "Auction timing not found"}), 400
     try:
-        end_time = datetime.fromisoformat(product["time"])
+        auction_end = datetime.fromisoformat(auction["valid_until"])
     except ValueError:
-        return jsonify({"error": "Invalid product time format"}), 400
-
-    now = datetime.utcnow()
-    if now >= end_time:
-        return jsonify({"error": "Cannot rollback bid. Bidding time is over."}), 400
+        return jsonify({"error": "Invalid auction end time format"}), 400
+    if datetime.utcnow() >= auction_end:
+        return jsonify({"error": "Cannot rollback bid. Auction has ended."}), 400
 
     amount = bid["amount"]
 
@@ -121,7 +123,7 @@ def rollback_bid():
         "username": username,
         "type": "refund",
         "amount": amount,
-        "timestamp": now,
+        "timestamp": datetime.utcnow(),
         "meta": {
             "product_id": bid["product_id"],
             "notes": f"Rollback of bid {str(bid_id)}"
