@@ -32,6 +32,27 @@ def list_auction_products(auction_id):
     prods = products.find({"auction_id": auction_id, "status":"unsold"})
     return jsonify([{"id":p["id"],"name":p["name"]} for p in prods]), 200
 
+
+
+
+@user_bp.route("/my_auctions",methods=["GET"])
+@token_required
+def my_auctions(decoded_token):
+    user_id = decoded_token["user_id"]
+    username = decoded_token["username"]
+
+    user = users.find_one({"username": username})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user_details = {
+        "id": str(user["_id"]),
+        "name": user.get("name"),
+        "username": user.get("username"),
+        "mobile_number": user.get("mobile_number"),
+        "auctions":user.get("auctions"),
+    }
+    return jsonify({"user_details": user_details}), 200
+
 # 3️⃣ Register for auction
 @user_bp.route("/auctions/register", methods=["POST"])
 @token_required
