@@ -12,16 +12,14 @@ app.register_blueprint(auth_bp, url_prefix='/')
 app.register_blueprint(wallet_bp, url_prefix='/')
 app.register_blueprint(user_bp, url_prefix='/')
 
+from flask_cors import CORS
+
 CORS(app,
      supports_credentials=True,
-     origins=[
-         "http://localhost:5173",
-         "https://smartauction.vercel.app",
-         "https://www.omnidim.io/",
-
-     ],
+     origins="*",
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
 utc = pytz.utc
 
 
